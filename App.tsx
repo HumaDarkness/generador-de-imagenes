@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { analyzeImage, improvePrompt, editImage } from './services/geminiService';
 import { Header } from './components/Header';
@@ -7,9 +8,8 @@ import { PromptDisplay } from './components/PromptDisplay';
 import { Footer } from './components/Footer';
 import { Editor } from './components/Editor';
 import { MagicEdits } from './components/MagicEdits';
-import { ApiInspector } from './components/ApiInspector';
 
-type Tab = 'analyzer' | 'editor' | 'api_inspector';
+type Tab = 'analyzer' | 'editor';
 
 const App: React.FC = () => {
   // State for Analyzer
@@ -28,7 +28,6 @@ const App: React.FC = () => {
   // State for active tab
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
 
-  // FIX: Memoize resetAnalyzerState with useCallback to ensure a stable function reference.
   const resetAnalyzerState = useCallback(() => {
     setGeneratedPrompt('');
     setError('');
@@ -38,7 +37,6 @@ const App: React.FC = () => {
     setMagicEditedImageUrl(null);
   }, []);
 
-  // FIX: Memoize handleImageSelect with useCallback as it depends on resetAnalyzerState.
   const handleImageSelect = useCallback((file: File) => {
     // Validate file
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -66,7 +64,6 @@ const App: React.FC = () => {
     reader.readAsDataURL(file);
   }, [resetAnalyzerState]);
 
-  // FIX: Add resetAnalyzerState to the dependency array of useCallback.
   const handleAnalyzeClick = useCallback(async () => {
     if (!imageFile) {
       setError('Por favor, selecciona una imagen primero.');
@@ -130,7 +127,6 @@ const App: React.FC = () => {
     }
   }, [imageFile]);
   
-  // FIX: Memoize handleClearMagicEdit with useCallback for consistency and performance.
   const handleClearMagicEdit = useCallback(() => {
     setMagicEditedImageUrl(null);
     setError('');
@@ -156,9 +152,6 @@ const App: React.FC = () => {
             </button>
             <button onClick={() => setActiveTab('editor')} className={getTabClass('editor')}>
                 Editor
-            </button>
-            <button onClick={() => setActiveTab('api_inspector')} className={getTabClass('api_inspector')}>
-                Inspector API
             </button>
         </nav>
 
@@ -271,7 +264,6 @@ const App: React.FC = () => {
             </div>
           )}
           {activeTab === 'editor' && <Editor />}
-          {activeTab === 'api_inspector' && <ApiInspector />}
         </main>
         <Footer />
       </div>
