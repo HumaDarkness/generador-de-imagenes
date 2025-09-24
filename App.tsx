@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { analyzeImage } from './services/geminiService';
+import { analyzeImage, improvePrompt } from './services/geminiService';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { Loader } from './components/Loader';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [isImproving, setIsImproving] = useState<boolean>(false);
   
   // State for active tab
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
@@ -69,6 +70,24 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [imageFile]);
+
+  const handleImprovePrompt = useCallback(async () => {
+    if (!generatedPrompt) return;
+
+    setIsImproving(true);
+    setError(''); // Clear previous errors
+
+    try {
+      const improved = await improvePrompt(generatedPrompt);
+      setGeneratedPrompt(improved);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+      setError(`Error al mejorar el prompt: ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setIsImproving(false);
+    }
+  }, [generatedPrompt]);
   
   const getTabClass = (tabName: Tab) => {
     const baseClass = "font-orbitron text-lg py-2 px-6 rounded-t-md transition-all duration-300 focus:outline-none";
@@ -140,7 +159,11 @@ const App: React.FC = () => {
                         <p>{error}</p>
                       </div>
                     ) : generatedPrompt ? (
-                      <PromptDisplay prompt={generatedPrompt} />
+                      <PromptDisplay 
+                        prompt={generatedPrompt}
+                        onImprovePrompt={handleImprovePrompt}
+                        isImproving={isImproving}
+                      />
                     ) : (
                       <div className="w-full h-full flex flex-col justify-center items-center text-center border-2 border-dashed border-cyan-700/50 rounded-lg p-4">
                           <svg className="w-16 h-16 text-cyan-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
