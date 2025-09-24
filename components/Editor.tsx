@@ -74,6 +74,7 @@ export const Editor: React.FC = () => {
   
   const addPoseSuggestion = (newSuggestion: string) => {
     const allSuggestions = [
+      'Haz que el sujeto esté de pie',
       'Haz que el sujeto esté sentado/a',
       'Haz que el sujeto cruce los brazos',
       'Haz que el sujeto esté caminando',
@@ -134,7 +135,14 @@ export const Editor: React.FC = () => {
 
         <div className="w-full">
           <h4 className="font-orbitron text-md text-cyan-400 mb-3 text-center">Sugerencias de Pose</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            <button
+              onClick={() => addPoseSuggestion('Haz que el sujeto esté de pie')}
+              disabled={isLoading}
+              className="font-orbitron text-sm bg-gray-800/50 border border-cyan-700/50 text-cyan-400 py-2 px-2 rounded-md transition-all duration-200 enabled:hover:bg-cyan-900/50 enabled:hover:border-cyan-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              De Pie
+            </button>
             <button
               onClick={() => addPoseSuggestion('Haz que el sujeto esté sentado/a')}
               disabled={isLoading}

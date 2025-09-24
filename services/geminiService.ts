@@ -18,35 +18,45 @@ const fileToBase64 = (file: File): Promise<string> => {
 const handleApiError = (error: unknown, context: 'analysis' | 'editing'): Error => {
   console.error(`Gemini API call failed for image ${context}:`, error);
   let friendlyErrorMessage = 'Ocurrió un error desconocido.';
+  let apiErrorPayload: any = null;
 
-  if (error instanceof Error) {
-    // The API often wraps its real error message inside a JSON string in the 'message' property.
+  // Case 1: The error is an object with an 'error' property (direct JSON response).
+  if (typeof error === 'object' && error !== null && 'error' in error) {
+      apiErrorPayload = (error as any).error;
+  }
+  // Case 2: The error is an Error instance, potentially with a JSON string in its message.
+  else if (error instanceof Error) {
     try {
-      const parsedError = JSON.parse(error.message);
-      if (parsedError.error && parsedError.error.message) {
-        const apiError = parsedError.error;
-        if (apiError.status === 'RESOURCE_EXHAUSTED' || apiError.code === 429) {
-          friendlyErrorMessage = 'Límite de cuota de API excedido. Por favor, revisa tu plan de facturación o inténtalo más tarde.';
-        } else {
-          // Use the more specific message from the API if available.
-          friendlyErrorMessage = apiError.message;
-        }
+      // Attempt to parse the message as JSON
+      const parsed = JSON.parse(error.message);
+      if (parsed.error && parsed.error.message) {
+        apiErrorPayload = parsed.error;
       } else {
-         // Not a JSON error message from the API, use the original message.
-         friendlyErrorMessage = error.message;
+        // Not the expected JSON structure, use the raw message.
+        friendlyErrorMessage = error.message;
       }
     } catch (e) {
-      // If parsing fails, it's just a regular error message.
+      // Parsing failed, it's a plain text error message.
       friendlyErrorMessage = error.message;
     }
   }
 
+  // If we successfully extracted an API error payload, format it.
+  if (apiErrorPayload) {
+    if (apiErrorPayload.status === 'RESOURCE_EXHAUSTED' || apiErrorPayload.code === 429) {
+      friendlyErrorMessage = 'Límite de cuota de API excedido. Por favor, revisa tu plan de facturación o inténtalo más tarde.';
+    } else {
+      friendlyErrorMessage = apiErrorPayload.message || 'La API devolvió un error no especificado.';
+    }
+  }
+  
   const prefix = context === 'editing' 
     ? 'No se pudo editar la imagen.' 
     : 'Error al analizar la imagen.';
     
   return new Error(`${prefix} ${friendlyErrorMessage}`);
 };
+
 
 export const analyzeImage = async (imageFile: File): Promise<string> => {
   if (!process.env.API_KEY) {
