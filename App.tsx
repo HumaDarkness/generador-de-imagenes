@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { analyzeImage, improvePrompt } from './services/geminiService';
+import { analyzeImage, improvePrompt, editImage } from './services/geminiService';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { Loader } from './components/Loader';
 import { PromptDisplay } from './components/PromptDisplay';
 import { Footer } from './components/Footer';
 import { Editor } from './components/Editor';
+import { MagicEdits } from './components/MagicEdits';
 
 type Tab = 'analyzer' | 'editor';
 
@@ -18,10 +19,26 @@ const App: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [isImproving, setIsImproving] = useState<boolean>(false);
   
+  // State for Magic Edits
+  const [isMagicEditing, setIsMagicEditing] = useState<boolean>(false);
+  const [activeMagicEdit, setActiveMagicEdit] = useState<string | null>(null);
+  const [magicEditedImageUrl, setMagicEditedImageUrl] = useState<string | null>(null);
+
   // State for active tab
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
 
-  const handleImageSelect = (file: File) => {
+  // FIX: Memoize resetAnalyzerState with useCallback to ensure a stable function reference.
+  const resetAnalyzerState = useCallback(() => {
+    setGeneratedPrompt('');
+    setError('');
+    setIsImproving(false);
+    setIsMagicEditing(false);
+    setActiveMagicEdit(null);
+    setMagicEditedImageUrl(null);
+  }, []);
+
+  // FIX: Memoize handleImageSelect with useCallback as it depends on resetAnalyzerState.
+  const handleImageSelect = useCallback((file: File) => {
     // Validate file
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -40,15 +57,15 @@ const App: React.FC = () => {
     }
 
     setImageFile(file);
-    setGeneratedPrompt('');
-    setError('');
+    resetAnalyzerState();
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreviewUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
-  };
+  }, [resetAnalyzerState]);
 
+  // FIX: Add resetAnalyzerState to the dependency array of useCallback.
   const handleAnalyzeClick = useCallback(async () => {
     if (!imageFile) {
       setError('Por favor, selecciona una imagen primero.');
@@ -56,8 +73,7 @@ const App: React.FC = () => {
     }
 
     setIsLoading(true);
-    setError('');
-    setGeneratedPrompt('');
+    resetAnalyzerState();
 
     try {
       const prompt = await analyzeImage(imageFile);
@@ -69,13 +85,13 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [imageFile]);
+  }, [imageFile, resetAnalyzerState]);
 
   const handleImprovePrompt = useCallback(async () => {
     if (!generatedPrompt) return;
 
     setIsImproving(true);
-    setError(''); // Clear previous errors
+    setError('');
 
     try {
       const improved = await improvePrompt(generatedPrompt);
@@ -88,6 +104,36 @@ const App: React.FC = () => {
       setIsImproving(false);
     }
   }, [generatedPrompt]);
+
+  const handleMagicEdit = useCallback(async (prompt: string, editName: string) => {
+    if (!imageFile) {
+      setError('Por favor, sube una imagen primero.');
+      return;
+    }
+
+    setIsMagicEditing(true);
+    setActiveMagicEdit(editName);
+    setError('');
+    setMagicEditedImageUrl(null);
+
+    try {
+      const base64Image = await editImage(imageFile, prompt);
+      setMagicEditedImageUrl(`data:image/png;base64,${base64Image}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+      setError(`Error al aplicar edición mágica: ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setIsMagicEditing(false);
+      setActiveMagicEdit(null);
+    }
+  }, [imageFile]);
+  
+  // FIX: Memoize handleClearMagicEdit with useCallback for consistency and performance.
+  const handleClearMagicEdit = useCallback(() => {
+    setMagicEditedImageUrl(null);
+    setError('');
+  }, []);
   
   const getTabClass = (tabName: Tab) => {
     const baseClass = "font-orbitron text-lg py-2 px-6 rounded-t-md transition-all duration-300 focus:outline-none";
@@ -122,7 +168,7 @@ const App: React.FC = () => {
                 />
                 <button
                   onClick={handleAnalyzeClick}
-                  disabled={!imageFile || isLoading}
+                  disabled={!imageFile || isLoading || isMagicEditing}
                   className="w-full max-w-xs font-orbitron text-lg bg-cyan-500/20 border-2 neon-border text-cyan-300 font-bold py-3 px-6 rounded-md transition-all duration-300 ease-in-out enabled:hover:bg-cyan-500/40 enabled:btn-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isLoading ? (
@@ -134,11 +180,54 @@ const App: React.FC = () => {
                     'Analizar Imagen'
                   )}
                 </button>
+                {imagePreviewUrl && (
+                  <MagicEdits 
+                    onMagicEdit={handleMagicEdit}
+                    isEditing={isLoading || isMagicEditing}
+                    activeEdit={activeMagicEdit}
+                  />
+                )}
               </div>
 
               <div className="flex flex-col justify-center items-center">
                  <div className="w-full min-h-[30rem] flex flex-col justify-center items-center text-center">
-                    {isLoading ? (
+                    {isMagicEditing ? (
+                        <>
+                          <Loader />
+                          <p className="mt-4 font-orbitron text-cyan-400 neon-text animate-pulse">APLICANDO MAGIA...</p>
+                          <p className="text-gray-400 text-sm mt-1">El modelo 'Banana' está trabajando.</p>
+                        </>
+                    ) : magicEditedImageUrl ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-black/30 border neon-border rounded-lg p-6 backdrop-blur-sm animate-fade-in">
+                            <h3 className="font-orbitron text-xl text-cyan-300 neon-text shrink-0 mb-4">
+                                Edición Mágica Aplicada
+                            </h3>
+                            <div className="flex-grow w-full min-h-0 flex items-center justify-center overflow-hidden">
+                                <img 
+                                    src={magicEditedImageUrl} 
+                                    alt="Imagen editada mágicamente" 
+                                    className="max-w-full max-h-full object-contain rounded-md" 
+                                />
+                            </div>
+                            <div className="flex items-center space-x-4 mt-4 shrink-0">
+                                <a
+                                  href={magicEditedImageUrl}
+                                  download="imagen-editada-magica.png"
+                                  className="flex items-center space-x-2 bg-cyan-500/10 hover:bg-cyan-500/30 text-cyan-300 font-semibold py-2 px-4 rounded-md transition-all duration-200 border border-cyan-500/30"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    <span>Descargar</span>
+                                </a>
+                                <button
+                                  onClick={handleClearMagicEdit}
+                                  className="flex items-center space-x-2 bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 font-semibold py-2 px-4 rounded-md transition-all duration-200 border border-gray-600/50"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" /></svg>
+                                    <span>Volver</span>
+                                </button>
+                            </div>
+                        </div>
+                    ) : isLoading ? (
                       imagePreviewUrl ? (
                         <div className="w-full h-full relative flex justify-center items-center rounded-lg overflow-hidden border-2 neon-border bg-black/30">
                           <img src={imagePreviewUrl} alt="Analizando" className="max-w-full max-h-full object-contain rounded-md opacity-40" />
