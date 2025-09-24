@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -14,7 +14,7 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-const handleApiError = (error: unknown, context: 'analysis' | 'editing' | 'prompt_improvement'): Error => {
+const handleApiError = (error: unknown, context: 'analysis' | 'editing' | 'prompt_improvement' | 'api_inspector'): Error => {
   console.error(`Gemini API call failed for context '${context}':`, error);
   let friendlyErrorMessage = 'Ocurrió un error desconocido.';
   let apiErrorPayload: any = null;
@@ -53,6 +53,8 @@ const handleApiError = (error: unknown, context: 'analysis' | 'editing' | 'promp
     ? 'No se pudo editar la imagen.' 
     : context === 'analysis'
     ? 'Error al analizar la imagen.'
+    : context === 'api_inspector'
+    ? 'Error en la petición a la API.'
     : 'Error al mejorar el prompt.';
     
   return new Error(`${prefix} ${friendlyErrorMessage}`);
@@ -174,3 +176,22 @@ export const improvePrompt = async (prompt: string): Promise<string> => {
     throw handleApiError(error, 'prompt_improvement');
   }
 };
+
+export const sendRawApiRequest = async (prompt: string): Promise<GenerateContentResponse> => {
+    if (!process.env.API_KEY) {
+      throw new Error("API key not found. Please set the API_KEY environment variable.");
+    }
+    
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+  
+      return response;
+    } catch (error) {
+      throw handleApiError(error, 'api_inspector');
+    }
+  };

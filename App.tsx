@@ -7,8 +7,9 @@ import { PromptDisplay } from './components/PromptDisplay';
 import { Footer } from './components/Footer';
 import { Editor } from './components/Editor';
 import { MagicEdits } from './components/MagicEdits';
+import { ApiInspector } from './components/ApiInspector';
 
-type Tab = 'analyzer' | 'editor';
+type Tab = 'analyzer' | 'editor' | 'api_inspector';
 
 const App: React.FC = () => {
   // State for Analyzer
@@ -156,6 +157,9 @@ const App: React.FC = () => {
             <button onClick={() => setActiveTab('editor')} className={getTabClass('editor')}>
                 Editor
             </button>
+            <button onClick={() => setActiveTab('api_inspector')} className={getTabClass('api_inspector')}>
+                Inspector API
+            </button>
         </nav>
 
         <main className="mt-8">
@@ -266,8 +270,8 @@ const App: React.FC = () => {
               </div>
             </div>
           )}
-
           {activeTab === 'editor' && <Editor />}
+          {activeTab === 'api_inspector' && <ApiInspector />}
         </main>
         <Footer />
       </div>
