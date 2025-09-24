@@ -1,0 +1,7 @@
+{
+  "name": "Analizador de Imágenes IA",
+  "description": "Sube una imagen para obtener una descripción detallada y un prompt en español, generado por IA con una estética futurista.",
+  "requestFramePermissions": [
+    "clipboard-read"
+  ]
+}
