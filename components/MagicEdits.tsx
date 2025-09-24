@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader } from './Loader';
+import { editImage } from '../services/geminiService';
 
 interface MagicEditsProps {
   onMagicEdit: (prompt: string, editName: string, imageFile: File) => Promise<void>;
@@ -32,94 +33,6 @@ const magicPrompts: MagicPrompt[] = [
   },
 ];
 
-// Función para convertir File a base64
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remover el prefijo "data:image/[tipo];base64,"
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-  });
-};
-
-// Función para llamar a la API de Gemini
-const callGeminiAPI = async (prompt: string, imageBase64: string, mimeType: string): Promise<string> => {
-  const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
-  if (!API_KEY) {
-    throw new Error('API Key de Gemini no configurada. Configura REACT_APP_GEMINI_API_KEY en tu archivo .env.local');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${API_KEY}`;
-  
-  const requestBody = {
-    contents: [{
-      parts: [
-        {
-          text: prompt
-        },
-        {
-          inline_data: {
-            mime_type: mimeType,
-            data: imageBase64
-          }
-        }
-      ]
-    }],
-    generation_config: {
-      temperature: 0.7,
-      candidate_count: 1,
-      max_output_tokens: 2048,
-    }
-  };
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      throw new Error(`Error de API: ${response.status} ${response.statusText}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`);
-    }
-
-    // La API de streaming devuelve múltiples objetos JSON separados por líneas
-    const responseText = await response.text();
-    const lines = responseText.split('\n').filter(line => line.trim());
-    
-    let resultText = '';
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.candidates && parsed.candidates[0] && parsed.candidates[0].content) {
-          const parts = parsed.candidates[0].content.parts;
-          for (const part of parts) {
-            if (part.text) {
-              resultText += part.text;
-            }
-          }
-        }
-      } catch (e) {
-        // Ignorar líneas que no sean JSON válido
-        continue;
-      }
-    }
-
-    return resultText || 'No se pudo procesar la imagen con Gemini';
-  } catch (error) {
-    console.error('Error calling Gemini API:', error);
-    throw error;
-  }
-};
-
 export const MagicEdits: React.FC<MagicEditsProps> = ({ 
   onMagicEdit, 
   isEditing, 
@@ -144,7 +57,7 @@ export const MagicEdits: React.FC<MagicEditsProps> = ({
   return (
     <div className="w-full bg-gray-900/30 border border-cyan-700/30 rounded-lg p-4 animate-fade-in">
       <h3 className="font-orbitron text-lg text-cyan-400 mb-4 text-center">
-        Ediciones Mágicas (con Gemini 2.0 Flash)
+        Ediciones Mágicas (con Gemini 2.5 Flash)
       </h3>
       
       {!imageFile && (
@@ -173,12 +86,11 @@ export const MagicEdits: React.FC<MagicEditsProps> = ({
       </div>
       
       <div className="text-xs text-gray-500 mt-3 text-center">
-        Las ediciones mágicas usan Gemini 2.0 Flash para procesar y transformar tus imágenes
+        Las ediciones mágicas usan Gemini 2.5 Flash Image Preview para procesar y transformar tus imágenes
       </div>
     </div>
   );
 };
 
-// Exportar también la función para usar en otros componentes
-export { callGeminiAPI, fileToBase64 };
+// Exportar también los tipos e interfaces
 export type { MagicEditsProps, MagicPrompt };
